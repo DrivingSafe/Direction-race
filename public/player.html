@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>목적지 레이스</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  html, body { margin:0; height:100%; background:#101720; color:#fff; font-family: sans-serif; overscroll-behavior:none; touch-action:none; }
+  #join { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; gap:16px; padding:24px; box-sizing:border-box; }
+  #join input { font-size:18px; padding:12px; width:80%; max-width:280px; border-radius:8px; border:none; text-align:center; }
+  #join button, #status { font-size:18px; padding:12px 24px; border-radius:8px; border:none; background:#4da3ff; color:#04162b; font-weight:600; }
+  #pad { display:none; height:100vh; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
+  #status { background:transparent; color:#8ef0c8; font-size:16px; padding:4px; }
+  .row { display:flex; gap:10px; }
+  .btn { width:88px; height:88px; border-radius:16px; background:#223; border:1px solid #345; color:#fff; font-size:32px; display:flex; align-items:center; justify-content:center; user-select:none; }
+  .btn:active { background:#345; }
+  #finished { display:none; text-align:center; }
+  #finished .big { font-size:40px; font-weight:700; color:#8ef0c8; }
+</style>
+</head>
+<body>
+<div id="join">
+  <h2 style="margin:0;">닉네임을 입력하세요</h2>
+  <input id="name" maxlength="12" placeholder="예: 김현석" />
+  <button id="joinBtn">참가하기</button>
+</div>
+
+<div id="pad">
+  <div id="status">방향키로 목적지까지 이동하세요</div>
+  <div class="row">
+    <div style="width:88px;"></div>
+    <div class="btn" data-k="up">▲</div>
+    <div style="width:88px;"></div>
+  </div>
+  <div class="row">
+    <div class="btn" data-k="left">◀</div>
+    <div style="width:88px;"></div>
+    <div class="btn" data-k="right">▶</div>
+  </div>
+  <div class="row">
+    <div style="width:88px;"></div>
+    <div class="btn" data-k="down">▼</div>
+    <div style="width:88px;"></div>
+  </div>
+</div>
+
+<div id="finished">
+  <div class="big" id="rankText"></div>
+  <div>도착했습니다!</div>
+</div>
+
+<script>
+const socket = io();
+const input = { up:false, down:false, left:false, right:false };
+let myId = null;
+
+document.getElementById('joinBtn').addEventListener('click', () => {
+  const name = document.getElementById('name').value;
+  socket.emit('join', name);
+});
+
+socket.on('joined', ({ id }) => {
+  myId = id;
+  document.getElementById('join').style.display = 'none';
+  document.getElementById('pad').style.display = 'flex';
+});
+
+socket.on('reset', () => {
+  document.getElementById('finished').style.display = 'none';
+  document.getElementById('pad').style.display = 'flex';
+});
+
+function sendInput(){ socket.emit('input', input); }
+
+document.querySelectorAll('.btn').forEach(btn => {
+  const k = btn.dataset.k;
+  const start = (e) => { e.preventDefault(); input[k] = true; sendInput(); };
+  const end = (e) => { e.preventDefault(); input[k] = false; sendInput(); };
+  btn.addEventListener('touchstart', start, {passive:false});
+  btn.addEventListener('touchend', end);
+  btn.addEventListener('touchcancel', end);
+  btn.addEventListener('mousedown', start);
+  btn.addEventListener('mouseup', end);
+  btn.addEventListener('mouseleave', end);
+});
+
+socket.on('arrived', ({ nickname, rank }) => {
+  const nameInput = document.getElementById('name').value;
+  if (nickname === nameInput.trim().slice(0,12) || nickname === nameInput) {
+    document.getElementById('rankText').textContent = rank + '등';
+    document.getElementById('pad').style.display = 'none';
+    document.getElementById('finished').style.display = 'block';
+  }
+});
+</script>
+</body>
+</html>
