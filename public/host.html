@@ -95,10 +95,12 @@ document.getElementById('championClose').addEventListener('click', () => {
 
 document.getElementById('advanceBtn').addEventListener('click', () => socket.emit('host:advance'));
 
-socket.on('arrived', ({ nickname, rank }) => {
-  popup.textContent = rank + '등 — ' + nickname;
-  popup.classList.add('show');
-  setTimeout(() => popup.classList.remove('show'), 2200);
+socket.on('arrived', ({ nickname, rank, isBot }) => {
+  if (!isBot) {
+    popup.textContent = rank + '등 — ' + nickname;
+    popup.classList.add('show');
+    setTimeout(() => popup.classList.remove('show'), 2200);
+  }
   renderRank();
 });
 

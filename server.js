@@ -149,17 +149,20 @@ const HARD_RAW = [
   { type: 'wall', x: -0.05, y: 0.24, w: 0.46, h: 0.032 },
   { type: 'wall', x: 0.59, y: 0.24, w: 0.46, h: 0.032 },
   { type: 'wall', x: -0.05, y: 0.36, w: 0.71, h: 0.032 },
-  { type: 'wall', x: 0.30, y: 0.48, w: 0.75, h: 0.032 },
+  // Row D: 갈림길 — 왼쪽은 좁고 빠른 회전바(위험/단거리), 오른쪽은 넓고 느긋한 범퍼(안전/여유)
+  { type: 'wall', x: 0.16, y: 0.48, w: 0.29, h: 0.032 },
+  { type: 'wall', x: 0.66, y: 0.48, w: 0.39, h: 0.032 },
   { type: 'wall', x: -0.05, y: 0.60, w: 0.47, h: 0.032 },
   { type: 'wall', x: 0.58, y: 0.60, w: 0.47, h: 0.032 },
   { type: 'wall', x: -0.05, y: 0.72, w: 0.87, h: 0.032 },
   { type: 'slow', x: 0.05, y: 0.86, w: 0.90, h: 0.06, factor: 0.28 },
   { type: 'diagWall', x1: 0.06, y1: 0.16, x2: 0.30, y2: 0.225, thickness: 0.035 },
-  { type: 'bounce', cx: 0.5, cy: 0.305, r: 0.042, moveAxis: 'x', moveRange: 0.07, moveSpeed: 1.0 },
-  { type: 'bounce', cx: 0.815, cy: 0.42, r: 0.042, moveAxis: 'y', moveRange: 0.05, moveSpeed: 1.1 },
-  { type: 'rotator', cx: 0.165, cy: 0.545, length: 0.22, thickness: 0.03, speed: 1.2 },
-  { type: 'bounce', cx: 0.5, cy: 0.676, r: 0.04, moveAxis: 'x', moveRange: 0.06, moveSpeed: 0.8 },
-  { type: 'rotator', cx: 0.895, cy: 0.79, length: 0.16, thickness: 0.03, speed: 1.4 },
+  { type: 'bounce', cx: 0.5, cy: 0.305, r: 0.042, moveAxis: 'x', moveRange: 0.07, moveSpeed: 1.15 },
+  { type: 'bounce', cx: 0.815, cy: 0.42, r: 0.042, moveAxis: 'y', moveRange: 0.05, moveSpeed: 1.25 },
+  { type: 'rotator', cx: 0.095, cy: 0.545, length: 0.13, thickness: 0.03, speed: 1.6 },   // 갈림길 왼쪽 (위험)
+  { type: 'bounce', cx: 0.555, cy: 0.545, r: 0.045, moveAxis: 'x', moveRange: 0.05, moveSpeed: 0.6 }, // 갈림길 오른쪽 (안전)
+  { type: 'bounce', cx: 0.5, cy: 0.676, r: 0.04, moveAxis: 'x', moveRange: 0.06, moveSpeed: 0.9 },
+  { type: 'rotator', cx: 0.895, cy: 0.79, length: 0.16, thickness: 0.03, speed: 1.55 },
 ];
 const HARD_GOAL = { x: 0.5, y: 0.07, r: 0.055 };
 
@@ -168,19 +171,22 @@ const EXTREME_RAW = [
   { type: 'wall', x: -0.05, w: 0.49, y: 0.20, h: 0.03 },
   { type: 'wall', x: 0.56, y: 0.20, w: 0.49, h: 0.03 },    // gap middle 0.44~0.56
   { type: 'wall', x: -0.05, y: 0.30, w: 0.79, h: 0.03 },   // gap right 0.74~0.97
-  { type: 'wall', x: 0.22, y: 0.40, w: 0.83, h: 0.03 },    // gap left 0.03~0.22
+  // Row D: 갈림길 — 왼쪽은 극도로 좁은 회전바 관문(초고위험), 오른쪽은 그나마 넓은 빠른 범퍼(고위험)
+  { type: 'wall', x: 0.11, y: 0.40, w: 0.28, h: 0.03 },
+  { type: 'wall', x: 0.60, y: 0.40, w: 0.45, h: 0.03 },
   { type: 'wall', x: -0.05, y: 0.50, w: 0.51, h: 0.03 },
   { type: 'wall', x: 0.54, y: 0.50, w: 0.51, h: 0.03 },    // gap middle 0.46~0.54
   { type: 'wall', x: -0.05, y: 0.60, w: 0.93, h: 0.03 },   // gap right 0.88~0.97
   { type: 'wall', x: 0.20, y: 0.70, w: 0.85, h: 0.03 },    // gap left 0.03~0.20
   { type: 'slow', x: 0.05, y: 0.84, w: 0.90, h: 0.06, factor: 0.2 },
   { type: 'diagWall', x1: 0.04, y1: 0.13, x2: 0.24, y2: 0.185, thickness: 0.04 },
-  { type: 'bounce', cx: 0.5, cy: 0.25, r: 0.04, moveAxis: 'x', moveRange: 0.04, moveSpeed: 1.3 },
-  { type: 'bounce', cx: 0.855, cy: 0.35, r: 0.04, moveAxis: 'y', moveRange: 0.04, moveSpeed: 1.4 },
-  { type: 'rotator', cx: 0.125, cy: 0.45, length: 0.16, thickness: 0.03, speed: 1.5 },
-  { type: 'bounce', cx: 0.5, cy: 0.55, r: 0.038, moveAxis: 'x', moveRange: 0.03, moveSpeed: 1.0 },
-  { type: 'rotator', cx: 0.925, cy: 0.65, length: 0.10, thickness: 0.03, speed: 1.7 },
-  { type: 'bounce', cx: 0.115, cy: 0.75, r: 0.038, moveAxis: 'y', moveRange: 0.03, moveSpeed: 1.2 },
+  { type: 'bounce', cx: 0.5, cy: 0.25, r: 0.04, moveAxis: 'x', moveRange: 0.04, moveSpeed: 1.4 },
+  { type: 'bounce', cx: 0.855, cy: 0.35, r: 0.04, moveAxis: 'y', moveRange: 0.04, moveSpeed: 1.5 },
+  { type: 'rotator', cx: 0.07, cy: 0.45, length: 0.07, thickness: 0.028, speed: 1.8 },     // 갈림길 왼쪽 (초고위험)
+  { type: 'bounce', cx: 0.495, cy: 0.45, r: 0.04, moveAxis: 'x', moveRange: 0.05, moveSpeed: 1.2 }, // 갈림길 오른쪽 (고위험)
+  { type: 'bounce', cx: 0.5, cy: 0.55, r: 0.038, moveAxis: 'x', moveRange: 0.03, moveSpeed: 1.1 },
+  { type: 'rotator', cx: 0.925, cy: 0.65, length: 0.10, thickness: 0.03, speed: 1.8 },
+  { type: 'bounce', cx: 0.115, cy: 0.75, r: 0.038, moveAxis: 'y', moveRange: 0.03, moveSpeed: 1.3 },
 ];
 const EXTREME_GOAL = { x: 0.5, y: 0.06, r: 0.04 };
 
@@ -238,43 +244,68 @@ function tick() {
       if (p.input.left) dx -= 1;
       if (p.input.right) dx += 1;
     }
-    const len = Math.hypot(dx, dy) || 1;
-    if (dx === 0 && dy === 0) continue;
 
-    let speed = p.isBot ? BASE_SPEED * (0.7 + Math.random() * 0.5) : BASE_SPEED;
-    for (const o of obstacles) {
-      if (o.type === 'slow' && rectIn(p.x, p.y, o)) speed *= o.factor;
+    if (dx !== 0 || dy !== 0) {
+      const len = Math.hypot(dx, dy) || 1;
+      let speed = p.isBot ? BASE_SPEED * (0.7 + Math.random() * 0.5) : BASE_SPEED;
+      for (const o of obstacles) {
+        if (o.type === 'slow' && rectIn(p.x, p.y, o)) speed *= o.factor;
+      }
+
+      const targetX = Math.min(0.97, Math.max(0.03, p.x + (dx / len) * speed));
+      const targetY = Math.min(0.97, Math.max(0.03, p.y + (dy / len) * speed));
+
+      // x축, y축을 따로 시도 -> 한쪽이 막혀도 다른 쪽으로는 계속 미끄러지듯 이동
+      if (!sweepBlocked(p.x, p.y, targetX, p.y, obstacles, PLAYER_R)) p.x = targetX;
+      if (!sweepBlocked(p.x, p.y, p.x, targetY, obstacles, PLAYER_R)) p.y = targetY;
     }
 
-    const targetX = Math.min(0.97, Math.max(0.03, p.x + (dx / len) * speed));
-    const targetY = Math.min(0.97, Math.max(0.03, p.y + (dy / len) * speed));
+    // 움직였든 안 움직였든 매 틱마다 실행: 범퍼/회전바가 "가만히 있는 참가자 쪽으로" 다가와도
+    // 뚫고 지나가지 않도록 항상 겹침을 풀어줌 (튕겨내기 + 회전바 밀어내기)
+    depenetrate(p, obstacles);
 
-    let nx = p.x, ny = p.y;
-    if (!sweepBlocked(p.x, p.y, targetX, p.y, obstacles, PLAYER_R)) nx = targetX;
-    if (!sweepBlocked(nx, p.y, nx, targetY, obstacles, PLAYER_R)) ny = targetY;
+    const distToGoal = Math.hypot(p.x - stage.goal.x, p.y - stage.goal.y);
+    if (distToGoal < stage.goal.r) {
+      p.finished = true;
+      p.rank = [...players.values()].filter(q => !q.eliminated && q.finished).length;
+      io.emit('arrived', { id: p.id, nickname: p.nickname, rank: p.rank, isBot: !!p.isBot });
+    }
+  }
+}
 
-    for (const o of obstacles) {
-      if (o.type !== 'bounce') continue;
-      const bdx = nx - o.x, bdy = ny - o.y;
+function depenetrate(p, obstacles) {
+  for (const o of obstacles) {
+    if (o.type === 'bounce') {
+      const bdx = p.x - o.x, bdy = p.y - o.y;
       const dist = Math.hypot(bdx, bdy) || 0.0001;
       const minDist = o.r + PLAYER_R;
       if (dist < minDist) {
         const ux = bdx / dist, uy = bdy / dist;
         const pushedX = Math.min(0.97, Math.max(0.03, o.x + ux * (minDist + BOUNCE_PUSH)));
         const pushedY = Math.min(0.97, Math.max(0.03, o.y + uy * (minDist + BOUNCE_PUSH)));
-        if (!sweepBlocked(nx, ny, pushedX, pushedY, obstacles, PLAYER_R)) {
-          nx = pushedX; ny = pushedY;
+        if (!sweepBlocked(p.x, p.y, pushedX, pushedY, obstacles, PLAYER_R)) {
+          p.x = pushedX; p.y = pushedY;
         }
       }
-    }
-
-    p.x = nx; p.y = ny;
-
-    const distToGoal = Math.hypot(p.x - stage.goal.x, p.y - stage.goal.y);
-    if (distToGoal < stage.goal.r) {
-      p.finished = true;
-      p.rank = [...players.values()].filter(q => !q.eliminated && q.finished).length;
-      io.emit('arrived', { id: p.id, nickname: p.nickname, rank: p.rank });
+    } else if (o.type === 'diagWall') {
+      const dist = pointSegDist(p.x, p.y, o.x1, o.y1, o.x2, o.y2);
+      const minDist = o.thickness / 2 + PLAYER_R;
+      if (dist < minDist) {
+        // 선분 위 가장 가까운 점에서 바깥쪽으로 밀어냄 (회전바가 다가와서 파묻히는 것 방지)
+        const dxseg = o.x2 - o.x1, dyseg = o.y2 - o.y1;
+        const lenSq = dxseg * dxseg + dyseg * dyseg;
+        let t = lenSq > 0 ? ((p.x - o.x1) * dxseg + (p.y - o.y1) * dyseg) / lenSq : 0;
+        t = Math.max(0, Math.min(1, t));
+        const cx = o.x1 + t * dxseg, cy = o.y1 + t * dyseg;
+        let ux = p.x - cx, uy = p.y - cy;
+        const d2 = Math.hypot(ux, uy) || 0.0001;
+        ux /= d2; uy /= d2;
+        const pushedX = Math.min(0.97, Math.max(0.03, cx + ux * (minDist + 0.01)));
+        const pushedY = Math.min(0.97, Math.max(0.03, cy + uy * (minDist + 0.01)));
+        if (!isWallBlocked(pushedX, pushedY, obstacles.filter(x => x !== o), PLAYER_R)) {
+          p.x = pushedX; p.y = pushedY;
+        }
+      }
     }
   }
 }
