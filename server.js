@@ -13,22 +13,33 @@ app.use(express.static(path.join(__dirname, 'public')));
 const GOAL = { x: 0.5, y: 0.07, r: 0.055 };
 const PLAYER_R = 0.016;
 
+// wall: 사각형 벽 / diagWall: 대각선(선분) 벽 / slow: 슬로우존 / bounce: 튕겨내는 범퍼
+// 벽의 "막힌 쪽"은 반드시 화면 경계(-0.05 ~ 1.05)까지 넘치게 그려서 양 끝으로 새는 틈이 없게 함
 const OBSTACLES = [
-  { type: 'wall', x: 0.32, y: 0.13, w: 0.63, h: 0.032 },
-  { type: 'wall', x: 0.05, y: 0.24, w: 0.36, h: 0.032 },
-  { type: 'wall', x: 0.59, y: 0.24, w: 0.36, h: 0.032 },
-  { type: 'wall', x: 0.05, y: 0.35, w: 0.63, h: 0.032 },
-  { type: 'wall', x: 0.30, y: 0.46, w: 0.65, h: 0.032 },
-  { type: 'wall', x: 0.05, y: 0.57, w: 0.38, h: 0.032 },
-  { type: 'wall', x: 0.57, y: 0.57, w: 0.38, h: 0.032 },
-  { type: 'wall', x: 0.20, y: 0.68, w: 0.60, h: 0.032 },
-  { type: 'slow', x: 0.05, y: 0.85, w: 0.90, h: 0.06, factor: 0.28 },
-  { type: 'bounce', cx: 0.22, cy: 0.18, r: 0.04, moveAxis: 'x', moveRange: 0.16, moveSpeed: 0.85 },
-  { type: 'bounce', cx: 0.78, cy: 0.29, r: 0.04, moveAxis: 'y', moveRange: 0.07, moveSpeed: 1.2 },
-  { type: 'bounce', cx: 0.5, cy: 0.40, r: 0.045, moveAxis: 'x', moveRange: 0.24, moveSpeed: 0.7 },
-  { type: 'bounce', cx: 0.22, cy: 0.51, r: 0.04, moveAxis: 'y', moveRange: 0.06, moveSpeed: 1.0 },
-  { type: 'bounce', cx: 0.5, cy: 0.62, r: 0.042, moveAxis: 'x', moveRange: 0.12, moveSpeed: 0.55 },
-  { type: 'bounce', cx: 0.5, cy: 0.755, r: 0.04, moveAxis: 'x', moveRange: 0.18, moveSpeed: 0.9 },
+  { type: 'wall', x: 0.34, y: 0.12, w: 0.71, h: 0.032 },
+  { type: 'wall', x: -0.05, y: 0.24, w: 0.46, h: 0.032 },
+  { type: 'wall', x: 0.59, y: 0.24, w: 0.46, h: 0.032 },
+  { type: 'diagWall', x1: 0.04, y1: 0.15, x2: 0.30, y2: 0.215, thickness: 0.03 },
+
+  { type: 'wall', x: -0.05, y: 0.36, w: 0.73, h: 0.032 },
+  { type: 'diagWall', x1: 0.72, y1: 0.365, x2: 0.95, y2: 0.44, thickness: 0.03 },
+
+  { type: 'wall', x: 0.30, y: 0.48, w: 0.75, h: 0.032 },
+
+  { type: 'wall', x: -0.05, y: 0.60, w: 0.47, h: 0.032 },
+  { type: 'wall', x: 0.58, y: 0.60, w: 0.47, h: 0.032 },
+  { type: 'diagWall', x1: 0.10, y1: 0.62, x2: 0.40, y2: 0.68, thickness: 0.032 },
+
+  { type: 'wall', x: -0.05, y: 0.72, w: 0.87, h: 0.032 },
+
+  { type: 'slow', x: 0.05, y: 0.86, w: 0.90, h: 0.06, factor: 0.28 },
+
+  { type: 'bounce', cx: 0.20, cy: 0.18, r: 0.04, moveAxis: 'x', moveRange: 0.14, moveSpeed: 0.85 },
+  { type: 'bounce', cx: 0.80, cy: 0.30, r: 0.04, moveAxis: 'y', moveRange: 0.06, moveSpeed: 1.2 },
+  { type: 'bounce', cx: 0.5, cy: 0.42, r: 0.045, moveAxis: 'x', moveRange: 0.22, moveSpeed: 0.7 },
+  { type: 'bounce', cx: 0.20, cy: 0.54, r: 0.04, moveAxis: 'y', moveRange: 0.06, moveSpeed: 1.0 },
+  { type: 'bounce', cx: 0.5, cy: 0.66, r: 0.042, moveAxis: 'x', moveRange: 0.14, moveSpeed: 0.6 },
+  { type: 'bounce', cx: 0.5, cy: 0.79, r: 0.04, moveAxis: 'x', moveRange: 0.2, moveSpeed: 0.9 },
 ];
 
 const BASE_SPEED = 0.011;
@@ -36,13 +47,30 @@ const BOUNCE_PUSH = 0.03;
 const TICK_MS = 50;
 const BROADCAST_MS = 66;
 const DISCONNECT_GRACE_MS = 30000;
-const GRID_N = 60; // 자율경로 탐색용 격자 해상도
+const GRID_N = 60;
 
 const players = new Map();
 let gameStarted = false;
 
 function rectHit(x, y, o) {
   return x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h;
+}
+
+function pointSegDist(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  let t = lenSq > 0 ? ((px - x1) * dx + (py - y1) * dy) / lenSq : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = x1 + t * dx, cy = y1 + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+
+function isWallBlocked(x, y, obstacles) {
+  for (const o of obstacles) {
+    if (o.type === 'wall' && rectHit(x, y, o)) return true;
+    if (o.type === 'diagWall' && pointSegDist(x, y, o.x1, o.y1, o.x2, o.y2) < o.thickness / 2) return true;
+  }
+  return false;
 }
 
 function resolveObstacles(now) {
@@ -56,14 +84,11 @@ function resolveObstacles(now) {
   });
 }
 
-// 이동 경로 전체를 여러 지점으로 쪼개 벽 통과(터널링) 여부를 확인
 function sweepBlocked(x0, y0, x1, y1, obstacles) {
   const steps = 10;
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
-    const x = x0 + (x1 - x0) * t;
-    const y = y0 + (y1 - y0) * t;
-    if (obstacles.some(o => o.type === 'wall' && rectHit(x, y, o))) return true;
+    if (isWallBlocked(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, obstacles)) return true;
   }
   return false;
 }
@@ -75,7 +100,7 @@ function buildFlowField() {
   for (let gx = 0; gx < N; gx++) {
     for (let gy = 0; gy < N; gy++) {
       const cx = (gx + 0.5) / N, cy = (gy + 0.5) / N;
-      if (OBSTACLES.some(o => o.type === 'wall' && rectHit(cx, cy, o))) blocked[gx][gy] = true;
+      if (isWallBlocked(cx, cy, OBSTACLES)) blocked[gx][gy] = true;
     }
   }
   const dist = Array.from({ length: N }, () => new Array(N).fill(Infinity));
@@ -173,7 +198,6 @@ function tick() {
         const ux = bdx / dist, uy = bdy / dist;
         const pushedX = Math.min(0.97, Math.max(0.03, o.x + ux * (minDist + BOUNCE_PUSH)));
         const pushedY = Math.min(0.97, Math.max(0.03, o.y + uy * (minDist + BOUNCE_PUSH)));
-        // 밀려나는 전체 경로도 함께 검사해서 벽을 뚫고 지나가지 못하게 함
         if (!sweepBlocked(nx, ny, pushedX, pushedY, obstacles)) {
           nx = pushedX; ny = pushedY;
         }
