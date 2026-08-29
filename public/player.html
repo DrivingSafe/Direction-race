@@ -20,7 +20,9 @@
 </style>
 </head>
 <body>
-<div id="join">
+<div id="stageBar" style="position:fixed; top:0; left:0; right:0; text-align:center; padding:8px; font-size:14px; font-weight:600; color:#8ef0c8; background:rgba(0,0,0,0.4); z-index:5;">1라운드 · 보통</div>
+
+<div id="join" style="padding-top:36px;">
   <h2 style="margin:0;">닉네임을 입력하세요</h2>
   <input id="name" maxlength="12" placeholder="예: 김현석" />
   <button id="joinBtn">참가하기</button>
@@ -28,7 +30,7 @@
 
 <div id="waiting" style="display:none; flex-direction:column; align-items:center; justify-content:center; height:100vh; gap:12px; text-align:center; padding:24px; box-sizing:border-box;">
   <h2 style="margin:0;">참가 완료!</h2>
-  <p style="color:#9ab; font-size:16px;">호스트가 시작하면 바로 방향키가 나타납니다.<br>화면을 켠 채로 잠시 기다려주세요.</p>
+  <p id="waitingMsg" style="color:#9ab; font-size:16px;">호스트가 시작하면 바로 방향키가 나타납니다.<br>화면을 켠 채로 잠시 기다려주세요.</p>
 </div>
 
 <div id="pad">
@@ -48,6 +50,11 @@
     <div class="btn" data-k="down">▼</div>
     <div style="width:88px;"></div>
   </div>
+</div>
+
+<div id="eliminated" style="display:none; flex-direction:column; align-items:center; justify-content:center; height:100vh; gap:12px; text-align:center; padding:24px; box-sizing:border-box;">
+  <h2 style="margin:0;">아쉽지만 탈락했습니다</h2>
+  <p style="color:#9ab; font-size:16px;">다음 라운드를 응원해주세요!</p>
 </div>
 
 <div id="finished">
@@ -79,30 +86,57 @@ socket.on('connect', () => {
   if (myNickname) socket.emit('join', { nickname: myNickname, clientId });
 });
 
-socket.on('joined', ({ id, finished, rank, started }) => {
+let iAmEliminated = false;
+
+function showScreen(id) {
+  const flexScreens = { waiting: 'flex', pad: 'flex', finished: 'block', eliminated: 'flex' };
+  Object.keys(flexScreens).forEach(s => { document.getElementById(s).style.display = 'none'; });
+  if (id) document.getElementById(id).style.display = flexScreens[id];
+}
+
+socket.on('joined', ({ id, finished, rank, started, eliminated, stageLabel }) => {
   myId = id;
   document.getElementById('join').style.display = 'none';
-  if (finished) {
+  if (stageLabel) document.getElementById('stageBar').textContent = stageLabel;
+  iAmEliminated = !!eliminated;
+  if (iAmEliminated) {
+    showScreen('eliminated');
+  } else if (finished) {
     document.getElementById('rankText').textContent = rank + '등';
-    document.getElementById('finished').style.display = 'block';
+    showScreen('finished');
   } else if (started) {
-    document.getElementById('pad').style.display = 'flex';
+    showScreen('pad');
   } else {
-    document.getElementById('waiting').style.display = 'flex';
+    showScreen('waiting');
   }
 });
 
 socket.on('game:start', () => {
-  document.getElementById('waiting').style.display = 'none';
-  if (document.getElementById('finished').style.display !== 'block') {
-    document.getElementById('pad').style.display = 'flex';
+  if (iAmEliminated) return;
+  if (document.getElementById('finished').style.display !== 'flex' && document.getElementById('finished').style.display !== 'block') {
+    showScreen('pad');
   }
 });
 
-socket.on('reset', () => {
-  document.getElementById('finished').style.display = 'none';
-  document.getElementById('pad').style.display = 'none';
-  document.getElementById('waiting').style.display = 'flex';
+socket.on('stage:change', ({ label }) => {
+  document.getElementById('stageBar').textContent = label;
+  if (iAmEliminated) return;
+  document.getElementById('waitingMsg').textContent = label + ' 라운드로 진출했습니다! 호스트가 시작하면 이어서 진행됩니다.';
+  showScreen('waiting');
+});
+
+socket.on('eliminated', ({ ids }) => {
+  if (ids.includes(clientId)) {
+    iAmEliminated = true;
+    showScreen('eliminated');
+  }
+});
+
+socket.on('reset', ({ stageLabel } = {}) => {
+  iAmEliminated = false;
+  if (stageLabel) document.getElementById('stageBar').textContent = stageLabel;
+  document.getElementById('waitingMsg').textContent = '호스트가 시작하면 바로 방향키가 나타납니다.';
+  showScreen('waiting');
 });
 
 function sendInput(){ socket.emit('input', input); }
@@ -122,8 +156,14 @@ document.querySelectorAll('.btn').forEach(btn => {
 socket.on('arrived', ({ id, rank }) => {
   if (id === clientId) {
     document.getElementById('rankText').textContent = rank + '등';
-    document.getElementById('pad').style.display = 'none';
-    document.getElementById('finished').style.display = 'block';
+    showScreen('finished');
+  }
+});
+
+socket.on('champion', ({ id }) => {
+  if (id === clientId) {
+    document.getElementById('rankText').textContent = '🏆 최종 우승!';
+    showScreen('finished');
   }
 });
 </script>

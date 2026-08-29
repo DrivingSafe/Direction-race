@@ -9,52 +9,9 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ---- 게임 설정 ----
-const GOAL = { x: 0.5, y: 0.07, r: 0.055 };
-const PLAYER_R = 0.016;
-
-// wall: 사각형 벽 / diagWall: 대각선(선분) 벽 / slow: 슬로우존 / bounce: 튕겨내는 범퍼
-// 벽의 "막힌 쪽"은 반드시 화면 경계(-0.05 ~ 1.05)까지 넘치게 그려서 양 끝으로 새는 틈이 없게 함
-const OBSTACLES = [
-  { type: 'wall', x: 0.34, y: 0.12, w: 0.71, h: 0.032 },
-  { type: 'wall', x: -0.05, y: 0.24, w: 0.46, h: 0.032 },
-  { type: 'wall', x: 0.59, y: 0.24, w: 0.46, h: 0.032 },
-  { type: 'diagWall', x1: 0.04, y1: 0.15, x2: 0.30, y2: 0.215, thickness: 0.03 },
-
-  { type: 'wall', x: -0.05, y: 0.36, w: 0.73, h: 0.032 },
-  { type: 'diagWall', x1: 0.72, y1: 0.365, x2: 0.95, y2: 0.44, thickness: 0.03 },
-
-  { type: 'wall', x: 0.30, y: 0.48, w: 0.75, h: 0.032 },
-
-  { type: 'wall', x: -0.05, y: 0.60, w: 0.47, h: 0.032 },
-  { type: 'wall', x: 0.58, y: 0.60, w: 0.47, h: 0.032 },
-  { type: 'diagWall', x1: 0.10, y1: 0.62, x2: 0.40, y2: 0.68, thickness: 0.032 },
-
-  { type: 'wall', x: -0.05, y: 0.72, w: 0.87, h: 0.032 },
-
-  { type: 'slow', x: 0.05, y: 0.86, w: 0.90, h: 0.06, factor: 0.28 },
-
-  { type: 'bounce', cx: 0.20, cy: 0.18, r: 0.04, moveAxis: 'x', moveRange: 0.14, moveSpeed: 0.85 },
-  { type: 'bounce', cx: 0.80, cy: 0.30, r: 0.04, moveAxis: 'y', moveRange: 0.06, moveSpeed: 1.2 },
-  { type: 'bounce', cx: 0.5, cy: 0.42, r: 0.045, moveAxis: 'x', moveRange: 0.22, moveSpeed: 0.7 },
-  { type: 'bounce', cx: 0.20, cy: 0.54, r: 0.04, moveAxis: 'y', moveRange: 0.06, moveSpeed: 1.0 },
-  { type: 'bounce', cx: 0.5, cy: 0.66, r: 0.042, moveAxis: 'x', moveRange: 0.14, moveSpeed: 0.6 },
-  { type: 'bounce', cx: 0.5, cy: 0.79, r: 0.04, moveAxis: 'x', moveRange: 0.2, moveSpeed: 0.9 },
-];
-
-const BASE_SPEED = 0.011;
+// ==== 공통 유틸 ====
+const PLAYER_R = 0.018;
 const BOUNCE_PUSH = 0.03;
-const TICK_MS = 50;
-const BROADCAST_MS = 66;
-const DISCONNECT_GRACE_MS = 30000;
-const GRID_N = 60;
-
-const players = new Map();
-let gameStarted = false;
-
-function rectHit(x, y, o) {
-  return x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h;
-}
 
 function pointSegDist(px, py, x1, y1, x2, y2) {
   const dx = x2 - x1, dy = y2 - y1;
@@ -65,47 +22,65 @@ function pointSegDist(px, py, x1, y1, x2, y2) {
   return Math.hypot(px - cx, py - cy);
 }
 
-function isWallBlocked(x, y, obstacles) {
+function isWallBlocked(x, y, obstacles, margin = 0) {
   for (const o of obstacles) {
-    if (o.type === 'wall' && rectHit(x, y, o)) return true;
-    if (o.type === 'diagWall' && pointSegDist(x, y, o.x1, o.y1, o.x2, o.y2) < o.thickness / 2) return true;
+    if (o.type === 'wall' &&
+        x > o.x - margin && x < o.x + o.w + margin &&
+        y > o.y - margin && y < o.y + o.h + margin) return true;
+    if (o.type === 'diagWall' && pointSegDist(x, y, o.x1, o.y1, o.x2, o.y2) < o.thickness / 2 + margin) return true;
   }
   return false;
 }
 
-function resolveObstacles(now) {
-  return OBSTACLES.map(o => {
-    if (o.type !== 'bounce') return o;
-    if (!o.moveAxis || o.moveAxis === 'none') return { type: 'bounce', x: o.cx, y: o.cy, r: o.r };
-    const t = (now / 1000) * (o.moveSpeed || 0.5);
-    const offset = Math.sin(t) * (o.moveRange || 0);
-    if (o.moveAxis === 'x') return { type: 'bounce', x: o.cx + offset, y: o.cy, r: o.r };
-    return { type: 'bounce', x: o.cx, y: o.cy + offset, r: o.r };
+function rectIn(x, y, o) {
+  return x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h;
+}
+
+function resolveObstacles(raw, now) {
+  return raw.map(o => {
+    if (o.type === 'bounce') {
+      if (!o.moveAxis || o.moveAxis === 'none') return { type: 'bounce', x: o.cx, y: o.cy, r: o.r };
+      const t = (now / 1000) * (o.moveSpeed || 0.5);
+      const offset = Math.sin(t) * (o.moveRange || 0);
+      if (o.moveAxis === 'x') return { type: 'bounce', x: o.cx + offset, y: o.cy, r: o.r };
+      return { type: 'bounce', x: o.cx, y: o.cy + offset, r: o.r };
+    }
+    if (o.type === 'rotator') {
+      const angle = (now / 1000) * (o.speed || 1);
+      const hl = o.length / 2;
+      return {
+        type: 'diagWall',
+        x1: o.cx - Math.cos(angle) * hl, y1: o.cy - Math.sin(angle) * hl,
+        x2: o.cx + Math.cos(angle) * hl, y2: o.cy + Math.sin(angle) * hl,
+        thickness: o.thickness,
+      };
+    }
+    return o;
   });
 }
 
-function sweepBlocked(x0, y0, x1, y1, obstacles) {
-  const steps = 10;
+function sweepBlocked(x0, y0, x1, y1, obstacles, margin = 0) {
+  const steps = 14;
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
-    if (isWallBlocked(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, obstacles)) return true;
+    if (isWallBlocked(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, obstacles, margin)) return true;
   }
   return false;
 }
 
-// ---- 봇 자율경로: 목표에서부터 BFS로 흐름장(flow field)을 한 번 계산해두고 재사용 ----
-function buildFlowField() {
+const GRID_N = 60;
+function buildFlowField(raw, goal) {
   const N = GRID_N;
   const blocked = Array.from({ length: N }, () => new Array(N).fill(false));
   for (let gx = 0; gx < N; gx++) {
     for (let gy = 0; gy < N; gy++) {
       const cx = (gx + 0.5) / N, cy = (gy + 0.5) / N;
-      if (isWallBlocked(cx, cy, OBSTACLES)) blocked[gx][gy] = true;
+      if (isWallBlocked(cx, cy, raw, PLAYER_R)) blocked[gx][gy] = true;
     }
   }
   const dist = Array.from({ length: N }, () => new Array(N).fill(Infinity));
   const queue = [];
-  const goalGx = Math.floor(GOAL.x * N), goalGy = Math.floor(GOAL.y * N);
+  const goalGx = Math.floor(goal.x * N), goalGy = Math.floor(goal.y * N);
   for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
     const gx = goalGx + dx, gy = goalGy + dy;
     if (gx >= 0 && gx < N && gy >= 0 && gy < N && !blocked[gx][gy] && dist[gx][gy] === Infinity) {
@@ -140,16 +115,15 @@ function buildFlowField() {
   }
   return { blocked, dir, N };
 }
-const FLOW = buildFlowField();
 
-function botDirection(p) {
-  const gx = Math.min(FLOW.N - 1, Math.max(0, Math.floor(p.x * FLOW.N)));
-  const gy = Math.min(FLOW.N - 1, Math.max(0, Math.floor(p.y * FLOW.N)));
+function botDirection(p, flow, goal) {
+  const gx = Math.min(flow.N - 1, Math.max(0, Math.floor(p.x * flow.N)));
+  const gy = Math.min(flow.N - 1, Math.max(0, Math.floor(p.y * flow.N)));
   let dx, dy;
-  if (FLOW.blocked[gx][gy] || !FLOW.dir[gx][gy]) {
-    dx = GOAL.x - p.x; dy = GOAL.y - p.y;
+  if (flow.blocked[gx][gy] || !flow.dir[gx][gy]) {
+    dx = goal.x - p.x; dy = goal.y - p.y;
   } else {
-    [dx, dy] = FLOW.dir[gx][gy];
+    [dx, dy] = flow.dir[gx][gy];
   }
   const len = Math.hypot(dx, dy) || 1;
   dx /= len; dy /= len;
@@ -158,16 +132,105 @@ function botDirection(p) {
   return { dx, dy };
 }
 
+// ==== 3단계 스테이지 정의 (보통 / 어려움 / 극악) ====
+// 통로(gap) 정중앙에만 동적 장애물을 둬서 실제로 반드시 마주치도록 구성
+
+const NORMAL_RAW = [
+  { type: 'wall', x: 0.40, y: 0.22, w: 0.65, h: 0.032 },   // gap left 0.03~0.40
+  { type: 'wall', x: -0.05, y: 0.45, w: 0.65, h: 0.032 },  // gap right 0.60~0.97
+  { type: 'wall', x: 0.40, y: 0.68, w: 0.65, h: 0.032 },   // gap left 0.03~0.40
+  { type: 'slow', x: 0.05, y: 0.86, w: 0.90, h: 0.06, factor: 0.4 },
+  { type: 'bounce', cx: 0.785, cy: 0.565, r: 0.045, moveAxis: 'x', moveRange: 0.06, moveSpeed: 0.5 },
+];
+const NORMAL_GOAL = { x: 0.5, y: 0.09, r: 0.065 };
+
+const HARD_RAW = [
+  { type: 'wall', x: 0.34, y: 0.12, w: 0.71, h: 0.032 },
+  { type: 'wall', x: -0.05, y: 0.24, w: 0.46, h: 0.032 },
+  { type: 'wall', x: 0.59, y: 0.24, w: 0.46, h: 0.032 },
+  { type: 'wall', x: -0.05, y: 0.36, w: 0.71, h: 0.032 },
+  { type: 'wall', x: 0.30, y: 0.48, w: 0.75, h: 0.032 },
+  { type: 'wall', x: -0.05, y: 0.60, w: 0.47, h: 0.032 },
+  { type: 'wall', x: 0.58, y: 0.60, w: 0.47, h: 0.032 },
+  { type: 'wall', x: -0.05, y: 0.72, w: 0.87, h: 0.032 },
+  { type: 'slow', x: 0.05, y: 0.86, w: 0.90, h: 0.06, factor: 0.28 },
+  { type: 'diagWall', x1: 0.06, y1: 0.16, x2: 0.30, y2: 0.225, thickness: 0.035 },
+  { type: 'bounce', cx: 0.5, cy: 0.305, r: 0.042, moveAxis: 'x', moveRange: 0.07, moveSpeed: 1.0 },
+  { type: 'bounce', cx: 0.815, cy: 0.42, r: 0.042, moveAxis: 'y', moveRange: 0.05, moveSpeed: 1.1 },
+  { type: 'rotator', cx: 0.165, cy: 0.545, length: 0.22, thickness: 0.03, speed: 1.2 },
+  { type: 'bounce', cx: 0.5, cy: 0.676, r: 0.04, moveAxis: 'x', moveRange: 0.06, moveSpeed: 0.8 },
+  { type: 'rotator', cx: 0.895, cy: 0.79, length: 0.16, thickness: 0.03, speed: 1.4 },
+];
+const HARD_GOAL = { x: 0.5, y: 0.07, r: 0.055 };
+
+const EXTREME_RAW = [
+  { type: 'wall', x: 0.26, y: 0.10, w: 0.79, h: 0.03 },    // gap left 0.03~0.26
+  { type: 'wall', x: -0.05, w: 0.49, y: 0.20, h: 0.03 },
+  { type: 'wall', x: 0.56, y: 0.20, w: 0.49, h: 0.03 },    // gap middle 0.44~0.56
+  { type: 'wall', x: -0.05, y: 0.30, w: 0.79, h: 0.03 },   // gap right 0.74~0.97
+  { type: 'wall', x: 0.22, y: 0.40, w: 0.83, h: 0.03 },    // gap left 0.03~0.22
+  { type: 'wall', x: -0.05, y: 0.50, w: 0.51, h: 0.03 },
+  { type: 'wall', x: 0.54, y: 0.50, w: 0.51, h: 0.03 },    // gap middle 0.46~0.54
+  { type: 'wall', x: -0.05, y: 0.60, w: 0.93, h: 0.03 },   // gap right 0.88~0.97
+  { type: 'wall', x: 0.20, y: 0.70, w: 0.85, h: 0.03 },    // gap left 0.03~0.20
+  { type: 'slow', x: 0.05, y: 0.84, w: 0.90, h: 0.06, factor: 0.2 },
+  { type: 'diagWall', x1: 0.04, y1: 0.13, x2: 0.24, y2: 0.185, thickness: 0.04 },
+  { type: 'bounce', cx: 0.5, cy: 0.25, r: 0.04, moveAxis: 'x', moveRange: 0.04, moveSpeed: 1.3 },
+  { type: 'bounce', cx: 0.855, cy: 0.35, r: 0.04, moveAxis: 'y', moveRange: 0.04, moveSpeed: 1.4 },
+  { type: 'rotator', cx: 0.125, cy: 0.45, length: 0.16, thickness: 0.03, speed: 1.5 },
+  { type: 'bounce', cx: 0.5, cy: 0.55, r: 0.038, moveAxis: 'x', moveRange: 0.03, moveSpeed: 1.0 },
+  { type: 'rotator', cx: 0.925, cy: 0.65, length: 0.10, thickness: 0.03, speed: 1.7 },
+  { type: 'bounce', cx: 0.115, cy: 0.75, r: 0.038, moveAxis: 'y', moveRange: 0.03, moveSpeed: 1.2 },
+];
+const EXTREME_GOAL = { x: 0.5, y: 0.06, r: 0.04 };
+
+const STAGES = [
+  { key: 'normal', label: '1라운드 · 보통', raw: NORMAL_RAW, goal: NORMAL_GOAL },
+  { key: 'hard', label: '2라운드 · 어려움', raw: HARD_RAW, goal: HARD_GOAL },
+  { key: 'extreme', label: '3라운드 · 극악', raw: EXTREME_RAW, goal: EXTREME_GOAL },
+];
+const FLOWS = STAGES.map(s => buildFlowField(s.raw, s.goal));
+
+const BASE_SPEED = 0.011;
+const TICK_MS = 50;
+const BROADCAST_MS = 66;
+const DISCONNECT_GRACE_MS = 30000;
+
+const players = new Map();
+let currentStageIndex = 0;
+let gameStarted = false;
+
+function spawnPos() {
+  return { x: 0.46 + Math.random() * 0.08, y: 0.93 + Math.random() * 0.03 };
+}
+
+function spawnPlayer(cid, nickname, isBot) {
+  const pos = spawnPos();
+  return {
+    id: cid,
+    nickname,
+    x: pos.x, y: pos.y,
+    input: { up: false, down: false, left: false, right: false },
+    finished: false,
+    rank: null,
+    eliminated: false,
+    disconnectTimer: null,
+    isBot: !!isBot,
+  };
+}
+
 function tick() {
   if (!gameStarted) return;
-  const obstacles = resolveObstacles(Date.now());
+  const stage = STAGES[currentStageIndex];
+  const flow = FLOWS[currentStageIndex];
+  const obstacles = resolveObstacles(stage.raw, Date.now());
 
   for (const p of players.values()) {
-    if (p.finished) continue;
+    if (p.finished || p.eliminated) continue;
 
     let dx = 0, dy = 0;
     if (p.isBot) {
-      const d = botDirection(p);
+      const d = botDirection(p, flow, stage.goal);
       dx = d.dx; dy = d.dy;
     } else {
       if (p.input.up) dy -= 1;
@@ -180,15 +243,16 @@ function tick() {
 
     let speed = p.isBot ? BASE_SPEED * (0.7 + Math.random() * 0.5) : BASE_SPEED;
     for (const o of obstacles) {
-      if (o.type === 'slow' && rectHit(p.x, p.y, o)) speed *= o.factor;
+      if (o.type === 'slow' && rectIn(p.x, p.y, o)) speed *= o.factor;
     }
 
-    const stepX = Math.min(0.97, Math.max(0.03, p.x + (dx / len) * speed));
-    const stepY = Math.min(0.97, Math.max(0.03, p.y + (dy / len) * speed));
+    const targetX = Math.min(0.97, Math.max(0.03, p.x + (dx / len) * speed));
+    const targetY = Math.min(0.97, Math.max(0.03, p.y + (dy / len) * speed));
 
-    if (sweepBlocked(p.x, p.y, stepX, stepY, obstacles)) continue;
+    let nx = p.x, ny = p.y;
+    if (!sweepBlocked(p.x, p.y, targetX, p.y, obstacles, PLAYER_R)) nx = targetX;
+    if (!sweepBlocked(nx, p.y, nx, targetY, obstacles, PLAYER_R)) ny = targetY;
 
-    let nx = stepX, ny = stepY;
     for (const o of obstacles) {
       if (o.type !== 'bounce') continue;
       const bdx = nx - o.x, bdy = ny - o.y;
@@ -198,7 +262,7 @@ function tick() {
         const ux = bdx / dist, uy = bdy / dist;
         const pushedX = Math.min(0.97, Math.max(0.03, o.x + ux * (minDist + BOUNCE_PUSH)));
         const pushedY = Math.min(0.97, Math.max(0.03, o.y + uy * (minDist + BOUNCE_PUSH)));
-        if (!sweepBlocked(nx, ny, pushedX, pushedY, obstacles)) {
+        if (!sweepBlocked(nx, ny, pushedX, pushedY, obstacles, PLAYER_R)) {
           nx = pushedX; ny = pushedY;
         }
       }
@@ -206,43 +270,34 @@ function tick() {
 
     p.x = nx; p.y = ny;
 
-    const distToGoal = Math.hypot(p.x - GOAL.x, p.y - GOAL.y);
-    if (distToGoal < GOAL.r) {
+    const distToGoal = Math.hypot(p.x - stage.goal.x, p.y - stage.goal.y);
+    if (distToGoal < stage.goal.r) {
       p.finished = true;
-      p.rank = [...players.values()].filter(q => q.finished).length;
+      p.rank = [...players.values()].filter(q => !q.eliminated && q.finished).length;
       io.emit('arrived', { id: p.id, nickname: p.nickname, rank: p.rank });
     }
   }
 }
 
 function broadcast() {
+  const stage = STAGES[currentStageIndex];
   const list = [...players.values()].map(p => ({
-    id: p.id, nickname: p.nickname, x: p.x, y: p.y, finished: p.finished, rank: p.rank, isBot: !!p.isBot
+    id: p.id, nickname: p.nickname, x: p.x, y: p.y,
+    finished: p.finished, rank: p.rank, isBot: !!p.isBot, eliminated: !!p.eliminated
   }));
   io.emit('state', {
     players: list,
-    goal: GOAL,
-    obstacles: resolveObstacles(Date.now()),
-    started: gameStarted
+    goal: stage.goal,
+    obstacles: resolveObstacles(stage.raw, Date.now()),
+    started: gameStarted,
+    stageIndex: currentStageIndex,
+    stageLabel: stage.label,
+    isLastStage: currentStageIndex === STAGES.length - 1,
   });
 }
 
 setInterval(tick, TICK_MS);
 setInterval(broadcast, BROADCAST_MS);
-
-function spawnPlayer(cid, nickname, isBot) {
-  return {
-    id: cid,
-    nickname,
-    x: 0.46 + Math.random() * 0.08,
-    y: 0.93 + Math.random() * 0.03,
-    input: { up: false, down: false, left: false, right: false },
-    finished: false,
-    rank: null,
-    disconnectTimer: null,
-    isBot: !!isBot,
-  };
-}
 
 io.on('connection', (socket) => {
   socket.on('join', ({ nickname, clientId } = {}) => {
@@ -255,10 +310,16 @@ io.on('connection', (socket) => {
       p.nickname = clean;
     } else {
       p = spawnPlayer(cid, clean, false);
+      // 이미 1라운드가 지났거나 진행 중인데 새로 들어온 경우: 공정성을 위해 관전자로 처리
+      if (currentStageIndex > 0) p.eliminated = true;
       players.set(cid, p);
     }
     socket.data.clientId = cid;
-    socket.emit('joined', { id: cid, finished: p.finished, rank: p.rank, started: gameStarted });
+    const stage = STAGES[currentStageIndex];
+    socket.emit('joined', {
+      id: cid, finished: p.finished, rank: p.rank, started: gameStarted,
+      eliminated: p.eliminated, stageLabel: stage.label
+    });
   });
 
   socket.on('input', (input) => {
@@ -272,20 +333,67 @@ io.on('connection', (socket) => {
   });
 
   socket.on('host:start', () => {
+    for (const p of players.values()) {
+      if (p.eliminated) continue;
+      p.finished = false;
+      p.rank = null;
+      const pos = spawnPos();
+      p.x = pos.x; p.y = pos.y;
+    }
     gameStarted = true;
     io.emit('game:start');
   });
 
+  socket.on('host:advance', () => {
+    const active = [...players.entries()].filter(([, p]) => !p.eliminated);
+    const goal = STAGES[currentStageIndex].goal;
+    active.sort((a, b) => {
+      const pa = a[1], pb = b[1];
+      if (pa.finished && pb.finished) return pa.rank - pb.rank;
+      if (pa.finished) return -1;
+      if (pb.finished) return 1;
+      const da = Math.hypot(pa.x - goal.x, pa.y - goal.y);
+      const db = Math.hypot(pb.x - goal.x, pb.y - goal.y);
+      return da - db;
+    });
+
+    if (currentStageIndex >= STAGES.length - 1) {
+      const champion = active[0];
+      if (champion) io.emit('champion', { id: champion[0], nickname: champion[1].nickname });
+      return;
+    }
+
+    const keepCount = Math.max(1, Math.ceil(active.length / 2));
+    const eliminatedIds = [];
+    active.forEach(([cid, p], idx) => {
+      if (idx >= keepCount) { p.eliminated = true; eliminatedIds.push(cid); }
+    });
+    io.emit('eliminated', { ids: eliminatedIds });
+
+    currentStageIndex += 1;
+    gameStarted = false;
+    for (const p of players.values()) {
+      if (p.eliminated) continue;
+      p.finished = false;
+      p.rank = null;
+      const pos = spawnPos();
+      p.x = pos.x; p.y = pos.y;
+    }
+    io.emit('stage:change', { index: currentStageIndex, label: STAGES[currentStageIndex].label, isLastStage: currentStageIndex === STAGES.length - 1 });
+  });
+
   socket.on('host:reset', () => {
+    currentStageIndex = 0;
     gameStarted = false;
     for (const [cid, p] of [...players.entries()]) {
       if (p.isBot) { players.delete(cid); continue; }
       p.finished = false;
       p.rank = null;
-      p.x = 0.46 + Math.random() * 0.08;
-      p.y = 0.93 + Math.random() * 0.03;
+      p.eliminated = false;
+      const pos = spawnPos();
+      p.x = pos.x; p.y = pos.y;
     }
-    io.emit('reset');
+    io.emit('reset', { stageLabel: STAGES[0].label });
   });
 
   socket.on('host:simulate', (count) => {

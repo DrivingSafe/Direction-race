@@ -38,12 +38,19 @@
       <h2>도착 순위</h2>
       <ol id="rank"></ol>
     </div>
+    <div id="stageLabel" style="font-size:16px; font-weight:600; color:#8ef0c8;">1라운드 · 보통</div>
     <div id="statusBadge" style="font-size:14px; color:#f5c542;">대기 중 — 시작 전에는 참가자가 움직일 수 없음</div>
-    <button id="startBtn" style="background:#1d9e75; font-weight:600;">게임 시작</button>
+    <button id="startBtn" style="background:#1d9e75; font-weight:600;">라운드 시작</button>
+    <button id="advanceBtn" style="background:#2a5da8; font-weight:600;">다음 라운드로 (상위 50%)</button>
     <button id="simBtn">150명 시뮬레이션</button>
     <button id="clearBotsBtn">봇 제거</button>
-    <button id="resetBtn">다시하기</button>
+    <button id="resetBtn">전체 초기화</button>
   </div>
+</div>
+<div id="champion" style="display:none; position:fixed; inset:0; background:rgba(5,8,12,0.92); color:#fff; align-items:center; justify-content:center; flex-direction:column; gap:12px; z-index:10;">
+  <div style="font-size:28px;">🏆 최종 우승</div>
+  <div id="championName" style="font-size:48px; font-weight:700; color:#f5c542;"></div>
+  <button id="championClose" style="margin-top:20px;">닫기</button>
 </div>
 
 <script>
@@ -67,8 +74,26 @@ let lastStarted = false;
 socket.on('state', (s) => {
   state = s;
   if (s.started !== lastStarted) { setStatus(s.started); lastStarted = s.started; }
+  document.getElementById('stageLabel').textContent = s.stageLabel;
+  document.getElementById('advanceBtn').textContent = s.isLastStage ? '우승자 확정' : '다음 라운드로 (상위 50%)';
   draw();
 });
+
+socket.on('stage:change', ({ label }) => {
+  document.getElementById('stageLabel').textContent = label;
+  rankEl.innerHTML = '';
+  setStatus(false);
+});
+
+socket.on('champion', ({ nickname }) => {
+  document.getElementById('championName').textContent = nickname;
+  document.getElementById('champion').style.display = 'flex';
+});
+document.getElementById('championClose').addEventListener('click', () => {
+  document.getElementById('champion').style.display = 'none';
+});
+
+document.getElementById('advanceBtn').addEventListener('click', () => socket.emit('host:advance'));
 
 socket.on('arrived', ({ nickname, rank }) => {
   popup.textContent = rank + '등 — ' + nickname;
@@ -77,9 +102,10 @@ socket.on('arrived', ({ nickname, rank }) => {
   renderRank();
 });
 
-socket.on('reset', () => {
+socket.on('reset', (payload) => {
   rankEl.innerHTML = '';
   setStatus(false);
+  if (payload && payload.stageLabel) document.getElementById('stageLabel').textContent = payload.stageLabel;
 });
 
 function setStatus(started){
@@ -158,8 +184,9 @@ function draw(){
   ctx.textAlign = 'center';
   ctx.fillText('GOAL', px(state.goal.x), py(state.goal.y) + 5);
 
-  // 참가자 (봇은 라벨 없이 작게 그려서 다수여도 화면이 덜 복잡하게)
+  // 참가자 (탈락자는 표시 안 함 / 봇은 라벨 없이 작게)
   state.players.forEach(p => {
+    if (p.eliminated) return;
     ctx.beginPath();
     ctx.arc(px(p.x), py(p.y), p.isBot ? 4 : 8, 0, Math.PI*2);
     ctx.fillStyle = p.finished ? '#556' : (p.isBot ? '#8899aa' : '#4da3ff');
