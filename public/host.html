@@ -106,11 +106,23 @@ function draw(){
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0,0,W,H);
 
+  // 창 비율과 무관하게 항상 정사각형 판정 영역만 사용 (충돌 판정과 화면 표시를 일치시킴)
+  const S = Math.min(W, H);
+  const offX = (W - S) / 2;
+  const offY = (H - S) / 2;
+  const px = (nx) => offX + nx * S;
+  const py = (ny) => offY + ny * S;
+  const pr = (nr) => nr * S;
+
+  ctx.strokeStyle = '#223';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(offX, offY, S, S);
+
   // 장애물
   state.obstacles.forEach(o => {
     if (o.type === 'bounce') {
       ctx.beginPath();
-      ctx.arc(o.x*W, o.y*H, o.r*W, 0, Math.PI*2);
+      ctx.arc(px(o.x), py(o.y), pr(o.r), 0, Math.PI*2);
       ctx.fillStyle = 'rgba(212,83,126,0.35)';
       ctx.fill();
       ctx.strokeStyle = '#d4537e';
@@ -119,12 +131,12 @@ function draw(){
       return;
     }
     ctx.fillStyle = o.type === 'wall' ? '#3a4552' : 'rgba(90,140,200,0.25)';
-    ctx.fillRect(o.x*W, o.y*H, o.w*W, o.h*H);
+    ctx.fillRect(px(o.x), py(o.y), pr(o.w), pr(o.h));
   });
 
   // 목표
   ctx.beginPath();
-  ctx.arc(state.goal.x*W, state.goal.y*H, state.goal.r*W, 0, Math.PI*2);
+  ctx.arc(px(state.goal.x), py(state.goal.y), pr(state.goal.r), 0, Math.PI*2);
   ctx.fillStyle = 'rgba(29,158,117,0.25)';
   ctx.fill();
   ctx.strokeStyle = '#1d9e75';
@@ -133,18 +145,18 @@ function draw(){
   ctx.fillStyle = '#8ef0c8';
   ctx.font = '16px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('GOAL', state.goal.x*W, state.goal.y*H + 5);
+  ctx.fillText('GOAL', px(state.goal.x), py(state.goal.y) + 5);
 
   // 참가자 (봇은 라벨 없이 작게 그려서 다수여도 화면이 덜 복잡하게)
   state.players.forEach(p => {
     ctx.beginPath();
-    ctx.arc(p.x*W, p.y*H, p.isBot ? 4 : 8, 0, Math.PI*2);
+    ctx.arc(px(p.x), py(p.y), p.isBot ? 4 : 8, 0, Math.PI*2);
     ctx.fillStyle = p.finished ? '#556' : (p.isBot ? '#8899aa' : '#4da3ff');
     ctx.fill();
     if (!p.isBot) {
       ctx.fillStyle = '#cde';
       ctx.font = '12px sans-serif';
-      ctx.fillText(p.nickname, p.x*W, p.y*H - 14);
+      ctx.fillText(p.nickname, px(p.x), py(p.y) - 14);
     }
   });
 }

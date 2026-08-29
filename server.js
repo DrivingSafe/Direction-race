@@ -15,16 +15,19 @@ const PLAYER_R = 0.016;
 
 // 벽(wall) / 슬로우존(slow) / 튕겨내는 범퍼(bounce, moveAxis로 왕복 이동)
 const OBSTACLES = [
-  { type: 'wall', x: 0.32, y: 0.18, w: 0.63, h: 0.035 },
-  { type: 'wall', x: 0.05, y: 0.32, w: 0.40, h: 0.035 },
-  { type: 'wall', x: 0.55, y: 0.32, w: 0.40, h: 0.035 },
-  { type: 'wall', x: 0.05, y: 0.46, w: 0.63, h: 0.035 },
-  { type: 'wall', x: 0.30, y: 0.60, w: 0.65, h: 0.035 },
-  { type: 'slow', x: 0.05, y: 0.86, w: 0.90, h: 0.08, factor: 0.4 },
-  { type: 'bounce', cx: 0.22, cy: 0.25, r: 0.042, moveAxis: 'x', moveRange: 0.14, moveSpeed: 0.55 },
-  { type: 'bounce', cx: 0.78, cy: 0.39, r: 0.042, moveAxis: 'y', moveRange: 0.06, moveSpeed: 0.8 },
-  { type: 'bounce', cx: 0.5, cy: 0.53, r: 0.045, moveAxis: 'x', moveRange: 0.18, moveSpeed: 0.45 },
-  { type: 'bounce', cx: 0.5, cy: 0.685, r: 0.04, moveAxis: 'none' },
+  { type: 'wall', x: 0.32, y: 0.15, w: 0.63, h: 0.035 },
+  { type: 'wall', x: 0.05, y: 0.27, w: 0.38, h: 0.035 },
+  { type: 'wall', x: 0.57, y: 0.27, w: 0.38, h: 0.035 },
+  { type: 'wall', x: 0.05, y: 0.39, w: 0.63, h: 0.035 },
+  { type: 'wall', x: 0.30, y: 0.51, w: 0.65, h: 0.035 },
+  { type: 'wall', x: 0.05, y: 0.63, w: 0.40, h: 0.035 },
+  { type: 'wall', x: 0.55, y: 0.63, w: 0.40, h: 0.035 },
+  { type: 'slow', x: 0.05, y: 0.83, w: 0.90, h: 0.07, factor: 0.3 },
+  { type: 'bounce', cx: 0.22, cy: 0.21, r: 0.042, moveAxis: 'x', moveRange: 0.16, moveSpeed: 0.8 },
+  { type: 'bounce', cx: 0.78, cy: 0.33, r: 0.042, moveAxis: 'y', moveRange: 0.07, moveSpeed: 1.1 },
+  { type: 'bounce', cx: 0.5, cy: 0.45, r: 0.045, moveAxis: 'x', moveRange: 0.22, moveSpeed: 0.65 },
+  { type: 'bounce', cx: 0.25, cy: 0.57, r: 0.04, moveAxis: 'y', moveRange: 0.06, moveSpeed: 0.9 },
+  { type: 'bounce', cx: 0.5, cy: 0.71, r: 0.04, moveAxis: 'x', moveRange: 0.1, moveSpeed: 0.5 },
 ];
 
 const BASE_SPEED = 0.011;
@@ -135,8 +138,8 @@ function spawnPlayer(cid, nickname, isBot) {
   return {
     id: cid,
     nickname,
-    x: 0.1 + Math.random() * 0.8,
-    y: 0.9 + Math.random() * 0.06,
+    x: 0.46 + Math.random() * 0.08,
+    y: 0.93 + Math.random() * 0.03,
     input: { up: false, down: false, left: false, right: false },
     finished: false,
     rank: null,
@@ -183,8 +186,8 @@ io.on('connection', (socket) => {
       if (p.isBot) { players.delete(cid); continue; }
       p.finished = false;
       p.rank = null;
-      p.x = 0.1 + Math.random() * 0.8;
-      p.y = 0.9 + Math.random() * 0.06;
+      p.x = 0.46 + Math.random() * 0.08;
+      p.y = 0.93 + Math.random() * 0.03;
     }
     io.emit('reset');
   });
