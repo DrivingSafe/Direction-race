@@ -37,6 +37,10 @@
       <h2>도착 순위</h2>
       <ol id="rank"></ol>
     </div>
+    <div id="statusBadge" style="font-size:14px; color:#f5c542;">대기 중 — 시작 전에는 참가자가 움직일 수 없음</div>
+    <button id="startBtn" style="background:#1d9e75; font-weight:600;">게임 시작</button>
+    <button id="simBtn">150명 시뮬레이션</button>
+    <button id="clearBotsBtn">봇 제거</button>
     <button id="resetBtn">다시하기</button>
   </div>
 </div>
@@ -58,7 +62,12 @@ new QRCode(document.getElementById('qr'), { text: playerUrl, width: 180, height:
 
 let state = { players: [], goal: {x:0.5,y:0.1,r:0.07}, obstacles: [] };
 
-socket.on('state', (s) => { state = s; draw(); });
+let lastStarted = false;
+socket.on('state', (s) => {
+  state = s;
+  if (s.started !== lastStarted) { setStatus(s.started); lastStarted = s.started; }
+  draw();
+});
 
 socket.on('arrived', ({ nickname, rank }) => {
   popup.textContent = rank + '등 — ' + nickname;
@@ -67,8 +76,25 @@ socket.on('arrived', ({ nickname, rank }) => {
   renderRank();
 });
 
-socket.on('reset', () => { rankEl.innerHTML = ''; });
+socket.on('reset', () => {
+  rankEl.innerHTML = '';
+  setStatus(false);
+});
 
+function setStatus(started){
+  const badge = document.getElementById('statusBadge');
+  if (started) {
+    badge.textContent = '진행 중';
+    badge.style.color = '#4da3ff';
+  } else {
+    badge.textContent = '대기 중 — 시작 전에는 참가자가 움직일 수 없음';
+    badge.style.color = '#f5c542';
+  }
+}
+
+document.getElementById('startBtn').addEventListener('click', () => socket.emit('host:start'));
+document.getElementById('simBtn').addEventListener('click', () => socket.emit('host:simulate', 150));
+document.getElementById('clearBotsBtn').addEventListener('click', () => socket.emit('host:clearBots'));
 document.getElementById('resetBtn').addEventListener('click', () => socket.emit('host:reset'));
 
 function renderRank(){
@@ -82,6 +108,16 @@ function draw(){
 
   // 장애물
   state.obstacles.forEach(o => {
+    if (o.type === 'bounce') {
+      ctx.beginPath();
+      ctx.arc(o.x*W, o.y*H, o.r*W, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(212,83,126,0.35)';
+      ctx.fill();
+      ctx.strokeStyle = '#d4537e';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      return;
+    }
     ctx.fillStyle = o.type === 'wall' ? '#3a4552' : 'rgba(90,140,200,0.25)';
     ctx.fillRect(o.x*W, o.y*H, o.w*W, o.h*H);
   });
@@ -99,15 +135,17 @@ function draw(){
   ctx.textAlign = 'center';
   ctx.fillText('GOAL', state.goal.x*W, state.goal.y*H + 5);
 
-  // 참가자
+  // 참가자 (봇은 라벨 없이 작게 그려서 다수여도 화면이 덜 복잡하게)
   state.players.forEach(p => {
     ctx.beginPath();
-    ctx.arc(p.x*W, p.y*H, 8, 0, Math.PI*2);
-    ctx.fillStyle = p.finished ? '#556' : '#4da3ff';
+    ctx.arc(p.x*W, p.y*H, p.isBot ? 4 : 8, 0, Math.PI*2);
+    ctx.fillStyle = p.finished ? '#556' : (p.isBot ? '#8899aa' : '#4da3ff');
     ctx.fill();
-    ctx.fillStyle = '#cde';
-    ctx.font = '12px sans-serif';
-    ctx.fillText(p.nickname, p.x*W, p.y*H - 14);
+    if (!p.isBot) {
+      ctx.fillStyle = '#cde';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(p.nickname, p.x*W, p.y*H - 14);
+    }
   });
 }
 </script>

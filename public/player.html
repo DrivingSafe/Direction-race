@@ -26,6 +26,11 @@
   <button id="joinBtn">참가하기</button>
 </div>
 
+<div id="waiting" style="display:none; flex-direction:column; align-items:center; justify-content:center; height:100vh; gap:12px; text-align:center; padding:24px; box-sizing:border-box;">
+  <h2 style="margin:0;">참가 완료!</h2>
+  <p style="color:#9ab; font-size:16px;">호스트가 시작하면 바로 방향키가 나타납니다.<br>화면을 켠 채로 잠시 기다려주세요.</p>
+</div>
+
 <div id="pad">
   <div id="status">방향키로 목적지까지 이동하세요</div>
   <div class="row">
@@ -54,21 +59,50 @@
 const socket = io();
 const input = { up:false, down:false, left:false, right:false };
 let myId = null;
+let myNickname = null;
+
+// 이 폰을 식별하는 고유 ID. 연결이 끊겼다 다시 붙어도 같은 사람으로 인식시키는 용도.
+let clientId = localStorage.getItem('race_client_id');
+if (!clientId) {
+  clientId = 'c_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem('race_client_id', clientId);
+}
 
 document.getElementById('joinBtn').addEventListener('click', () => {
-  const name = document.getElementById('name').value;
-  socket.emit('join', name);
+  myNickname = document.getElementById('name').value;
+  socket.emit('join', { nickname: myNickname, clientId });
 });
 
-socket.on('joined', ({ id }) => {
+// 최초 접속뿐 아니라, 와이파이가 끊겼다 재연결될 때도 이 이벤트가 다시 발생함.
+// 이미 참가한 적 있으면 자동으로 다시 join해서 같은 사람으로 이어서 진행.
+socket.on('connect', () => {
+  if (myNickname) socket.emit('join', { nickname: myNickname, clientId });
+});
+
+socket.on('joined', ({ id, finished, rank, started }) => {
   myId = id;
   document.getElementById('join').style.display = 'none';
-  document.getElementById('pad').style.display = 'flex';
+  if (finished) {
+    document.getElementById('rankText').textContent = rank + '등';
+    document.getElementById('finished').style.display = 'block';
+  } else if (started) {
+    document.getElementById('pad').style.display = 'flex';
+  } else {
+    document.getElementById('waiting').style.display = 'flex';
+  }
+});
+
+socket.on('game:start', () => {
+  document.getElementById('waiting').style.display = 'none';
+  if (document.getElementById('finished').style.display !== 'block') {
+    document.getElementById('pad').style.display = 'flex';
+  }
 });
 
 socket.on('reset', () => {
   document.getElementById('finished').style.display = 'none';
-  document.getElementById('pad').style.display = 'flex';
+  document.getElementById('pad').style.display = 'none';
+  document.getElementById('waiting').style.display = 'flex';
 });
 
 function sendInput(){ socket.emit('input', input); }
@@ -85,9 +119,8 @@ document.querySelectorAll('.btn').forEach(btn => {
   btn.addEventListener('mouseleave', end);
 });
 
-socket.on('arrived', ({ nickname, rank }) => {
-  const nameInput = document.getElementById('name').value;
-  if (nickname === nameInput.trim().slice(0,12) || nickname === nameInput) {
+socket.on('arrived', ({ id, rank }) => {
+  if (id === clientId) {
     document.getElementById('rankText').textContent = rank + '등';
     document.getElementById('pad').style.display = 'none';
     document.getElementById('finished').style.display = 'block';
